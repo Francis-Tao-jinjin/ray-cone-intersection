@@ -1,173 +1,62 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.dist3D_Line_to_Segment = exports.dist3D_Segment_to_Segment = exports.dist3D_Line_to_Line = void 0;
+exports.intersectCone = void 0;
 var gl_matrix_1 = require("gl-matrix");
-var EPSILON = 1e-6;
-function dist3D_Line_to_Line(L1, L2) {
-    var u = L1.dir;
-    var v = L2.dir;
-    var w = gl_matrix_1.vec3.sub(gl_matrix_1.vec3.create(), L1.origin, L2.origin);
-    var a = gl_matrix_1.vec3.dot(u, u);
-    var b = gl_matrix_1.vec3.dot(u, v);
-    var c = gl_matrix_1.vec3.dot(v, v);
-    var d = gl_matrix_1.vec3.dot(u, w);
-    var e = gl_matrix_1.vec3.dot(v, w);
-    var D = a * c - b * b;
-    var sc;
-    var tc;
-    if (D < EPSILON) {
-        sc = 0.0;
-        tc = (b > c ? (d / b) : (e / c));
+var ray_disk_intersection_1 = require("ray-disk-intersection");
+function intersectCone(cone, ray) {
+    var origin = ray.origin;
+    var dir = ray.dir;
+    var axis = cone.axis;
+    var tipPos = cone.tipPos;
+    var co = gl_matrix_1.vec3.sub(gl_matrix_1.vec3.create(), origin, tipPos);
+    var rDir_dot_axis = gl_matrix_1.vec3.dot(dir, axis);
+    var co_dot_axis = gl_matrix_1.vec3.dot(co, axis);
+    var cosA2 = cone.cosa * cone.cosa;
+    var a = rDir_dot_axis * rDir_dot_axis - cosA2;
+    var b = 2 * (rDir_dot_axis * co_dot_axis - gl_matrix_1.vec3.dot(dir, co) * cosA2);
+    var c = co_dot_axis * co_dot_axis - gl_matrix_1.vec3.dot(co, co) * cosA2;
+    var det = b * b - 4 * a * c;
+    if (det < 0) {
+        return null;
     }
-    else {
-        sc = ((b * e) - (c * d)) / D;
-        tc = ((a * e) - (b * d)) / D;
+    det = Math.sqrt(det);
+    var t1 = (-b - det) / (2. * a);
+    var t2 = (-b + det) / (2. * a);
+    var t = t1;
+    if (t < 0. || t2 > 0. && t2 < t) {
+        t = t2;
     }
-    var P1 = gl_matrix_1.vec3.scale(gl_matrix_1.vec3.create(), u, sc);
-    var P2 = gl_matrix_1.vec3.scale(gl_matrix_1.vec3.create(), v, tc);
-    var dP = gl_matrix_1.vec3.add(gl_matrix_1.vec3.create(), w, gl_matrix_1.vec3.sub(gl_matrix_1.vec3.create(), P1, P2));
+    if (t < 0.) {
+        return null;
+    }
+    var cp = gl_matrix_1.vec3.create();
+    gl_matrix_1.vec3.sub(cp, gl_matrix_1.vec3.add(cp, origin, gl_matrix_1.vec3.scale(cp, dir, t)), tipPos);
+    var h = gl_matrix_1.vec3.dot(cp, axis);
+    if (h < 0 || h > cone.height) {
+        return null;
+    }
+    var centerAtBottom = gl_matrix_1.vec3.scaleAndAdd(gl_matrix_1.vec3.create(), tipPos, axis, cone.height);
+    var h2 = cone.height * cone.height;
+    var disk = {
+        p: centerAtBottom,
+        n: axis,
+        r: Math.sqrt((h2 / cosA2) - h2),
+    };
+    var tDisk = ray_disk_intersection_1.intersectDisk(disk, ray);
+    if (tDisk !== null && tDisk < t) {
+        return {
+            t: tDisk,
+            n: gl_matrix_1.vec3.copy(gl_matrix_1.vec3.create(), axis),
+        };
+    }
+    var axis_dot_cp = gl_matrix_1.vec3.dot(axis, cp);
+    var cp2 = gl_matrix_1.vec3.dot(cp, cp);
+    var nor = gl_matrix_1.vec3.create();
+    gl_matrix_1.vec3.normalize(nor, gl_matrix_1.vec3.sub(nor, gl_matrix_1.vec3.scale(nor, cp, axis_dot_cp / cp2), axis));
     return {
-        distance: gl_matrix_1.vec3.len(dP),
-        l1_scale: sc,
-        l2_scale: tc,
+        t: t,
+        n: nor,
     };
 }
-exports.dist3D_Line_to_Line = dist3D_Line_to_Line;
-function dist3D_Segment_to_Segment(S1, S2) {
-    var u = gl_matrix_1.vec3.sub(gl_matrix_1.vec3.create(), S1.end, S1.start);
-    var v = gl_matrix_1.vec3.sub(gl_matrix_1.vec3.create(), S2.end, S2.start);
-    var w = gl_matrix_1.vec3.sub(gl_matrix_1.vec3.create(), S1.start, S2.start);
-    var a = gl_matrix_1.vec3.dot(u, u);
-    var b = gl_matrix_1.vec3.dot(u, v);
-    var c = gl_matrix_1.vec3.dot(v, v);
-    var d = gl_matrix_1.vec3.dot(u, w);
-    var e = gl_matrix_1.vec3.dot(v, w);
-    var D = a * c - b * b;
-    var sc;
-    var sN;
-    var sD = D;
-    var tc;
-    var tN;
-    var tD = D;
-    if (D < EPSILON) {
-        sN = 0.0;
-        sD = 1.0;
-        tN = e;
-        tD = c;
-    }
-    else {
-        sN = (b * e - c * d);
-        tN = (a * e - b * d);
-        if (sN < 0.0) {
-            sN = 0.0;
-            tN = e;
-            tD = c;
-        }
-        else if (sN > sD) {
-            sN = sD;
-            tN = e + b;
-            tD = c;
-        }
-    }
-    if (tN < 0.0) {
-        tN = 0.0;
-        if (-d < 0.0) {
-            sN = 0.0;
-        }
-        else if (-d > a) {
-            sN = sD;
-        }
-        else {
-            sN = -d;
-            sD = a;
-        }
-    }
-    else if (tN > tD) {
-        tN = tD;
-        if ((-d + b) < 0.0) {
-            sN = 0;
-        }
-        else if ((-d + b) > a) {
-            sN = sD;
-        }
-        else {
-            sN = (-d + b);
-            sD = a;
-        }
-    }
-    sc = (Math.abs(sN) < EPSILON ? 0.0 : sN / sD);
-    tc = (Math.abs(tN) < EPSILON ? 0.0 : tN / tD);
-    var P1 = gl_matrix_1.vec3.scale(gl_matrix_1.vec3.create(), u, sc);
-    var P2 = gl_matrix_1.vec3.scale(gl_matrix_1.vec3.create(), v, tc);
-    var dP = gl_matrix_1.vec3.add(gl_matrix_1.vec3.create(), w, gl_matrix_1.vec3.sub(gl_matrix_1.vec3.create(), P1, P2));
-    return {
-        distance: gl_matrix_1.vec3.length(dP),
-        s1_scale: sc,
-        s2_scale: tc,
-    };
-}
-exports.dist3D_Segment_to_Segment = dist3D_Segment_to_Segment;
-function dist3D_Line_to_Segment(L, S) {
-    var u = L.dir;
-    var v = gl_matrix_1.vec3.sub(gl_matrix_1.vec3.create(), S.end, S.start);
-    var w = gl_matrix_1.vec3.sub(gl_matrix_1.vec3.create(), L.origin, S.start);
-    var a = gl_matrix_1.vec3.dot(u, u);
-    var b = gl_matrix_1.vec3.dot(u, v);
-    var c = gl_matrix_1.vec3.dot(v, v);
-    var d = gl_matrix_1.vec3.dot(u, w);
-    var e = gl_matrix_1.vec3.dot(v, w);
-    var D = a * c - b * b;
-    var sc;
-    var sN;
-    var sD = D;
-    var tc;
-    var tN;
-    var tD = D;
-    if (D < EPSILON) {
-        sN = 0.0;
-        sD = 1.0;
-        tN = e;
-        tD = c;
-    }
-    else {
-        sN = (b * e - c * d);
-        tN = (a * e - b * d);
-        if (sN < 0.0) {
-            sN = 0.0;
-            tN = e;
-            tD = c;
-        }
-    }
-    if (tN < 0.0) {
-        tN = 0.0;
-        if (-d < 0.0) {
-            sN = 0.0;
-        }
-        else {
-            sN = -d;
-            sD = a;
-        }
-    }
-    else if (tN > tD) {
-        tN = tD;
-        if ((-d + b) < 0.0) {
-            sN = 0;
-        }
-        else {
-            sN = (-d + b);
-            sD = a;
-        }
-    }
-    sc = (Math.abs(sN) < EPSILON ? 0.0 : sN / sD);
-    tc = (Math.abs(tN) < EPSILON ? 0.0 : tN / tD);
-    var P1 = gl_matrix_1.vec3.scale(gl_matrix_1.vec3.create(), u, sc);
-    var P2 = gl_matrix_1.vec3.scale(gl_matrix_1.vec3.create(), v, tc);
-    var dP = gl_matrix_1.vec3.add(gl_matrix_1.vec3.create(), w, gl_matrix_1.vec3.sub(gl_matrix_1.vec3.create(), P1, P2));
-    return {
-        distance: gl_matrix_1.vec3.len(dP),
-        l1_scale: sc,
-        s2_scale: tc,
-    };
-}
-exports.dist3D_Line_to_Segment = dist3D_Line_to_Segment;
+exports.intersectCone = intersectCone;
 //# sourceMappingURL=index.js.map

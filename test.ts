@@ -1,76 +1,71 @@
 import tape = require('tape');
 import {
-    dist3D_Line_to_Line,
-    dist3D_Line_to_Segment,
-    dist3D_Segment_to_Segment,
-    Line,
-    Segment,
+    Cone,
+    intersectCone,
 } from './src';
+import { vec3 } from 'gl-matrix';
+import { table } from 'console';
 
-tape('dist3D_Line_to_Line 1', async (t) => {
-    const lineA:Line = {
-        origin: [0, 0, 0],
-        dir: [1, 0, 1],
+tape('cone intersection 1', async (t) => {
+    const cone:Cone = {
+        cosa: Math.cos(Math.PI / 4),
+        axis: [0, -1, 0],
+        height: 5,
+        tipPos: [0, 5, 0],
     };
 
-    const lineB:Line = {
-        origin: [32, 0, 0],
-        dir: [-1, 1, 1],
+    const ray = {
+        origin: [10, 4.999999, 0],
+        dir: [-1, 0, 0],
     };
-
-    const result = dist3D_Line_to_Line(lineA, lineB);
+    const result = intersectCone(cone, ray);
     console.log(result);
-    t.equal(Math.abs(result.distance - 13.063945294843615) < 1e-6, true, 'distance tolerance smaller than 1e-5');
+    if (result) {
+        t.equal(Math.abs(result.t - 10) < 1e-6, true, 'intersect at tip position');
+        t.equal(Math.abs(Math.sqrt(2) / 2 - result.n[0]) < 1e-6, true, 'normal.x at surface should be (√2)/2');
+    }
     t.end();
 });
 
-tape('dist3D_Line_to_Line 2', async (t) => {
-    const lineA:Line = {
-        origin: [0, 0, 0],
-        dir: [1, 0, 1],
+tape('cone intersection 2', async (t) => {
+    const cone:Cone = {
+        cosa: Math.cos(Math.PI / 4),
+        axis: [0, -1, 0],
+        height: 5,
+        tipPos: [0, 5, 0],
+    };
+    const ray = {
+        origin: [10, 2.5, 0],
+        dir: [-1, 0, 0],
     };
 
-    const lineB:Line = {
-        origin: [0, 5, 2],
-        dir: [1, 0, 0],
-    };
-
-    const result = dist3D_Line_to_Line(lineA, lineB);
+    const result = intersectCone(cone, ray);
     console.log(result);
-    t.equal(Math.abs(result.distance - 5) < 1e-6, true, 'distance tolerance smaller than 1e-5');
+    if (result) {
+        t.equal(Math.abs(result.t - 7.5) < 1e-6, true, 'scale factor is 7.5');
+        t.equal(Math.abs(Math.sqrt(2) / 2 - result.n[0]) < 1e-6, true, 'normal.x at surface should be (√2)/2');
+    }
     t.end();
 });
 
-tape('dist3D_Line_to_segment 1', async (t) => {
-    const lineA:Line = {
-        origin: [0, 0, 0],
-        dir: [1, 0, 1],
+tape('cone intersection 2', async (t) => {
+    const cone:Cone = {
+        cosa: Math.cos(Math.PI / 4),
+        axis: [0, -1, 0],
+        height: 5,
+        tipPos: [0, 5, 0],
     };
 
-    const segmentB:Segment = {
-        start: [4, 8, 0],
-        end: [19, 8, 0],
+    const ray = {
+        origin: [0, -2.5, 0],
+        dir: vec3.normalize(vec3.create(), [0.2, 0.9, 0]),
     };
 
-    const result = dist3D_Line_to_Segment(lineA, segmentB);
+    const result = intersectCone(cone, ray);
+    console.log('ray shoot from the bottom, should intersect with bottom disk');
     console.log(result);
-    t.equal(Math.abs(result.distance - Math.sqrt(72)) < 1e-6, true, 'distance tolerance smaller than 1e-5');
-    t.end();
-});
-
-tape('dist3D_segment_to_segment 1', async (t) => {
-    const segmentA:Segment = {
-        start: [0, 0, 5],
-        end: [0, 0, 20],
-    };
-
-    const segmentB:Segment = {
-        start: [4, 8, 0],
-        end: [19, 8, 0],
-    };
-
-    const result = dist3D_Segment_to_Segment(segmentA, segmentB);
-    console.log(result);
-    t.equal(Math.abs(result.distance - Math.sqrt(105)) < 1e-6, true, 'distance tolerance smaller than 1e-5');
+    if (result) {
+        t.equal(result.n[1], -1, 'the bottom disk normal.y is -1');
+    }
     t.end();
 });

@@ -33,6 +33,7 @@
   },
   "dependencies": {
     "gl-matrix": "^3.3.0",
+    "ray-disk-intersection": "^1.0.1",
     "tape": "^4.9.1",
     "ts-node": "^7.0.1",
     "tsify": "^4.0.1",
